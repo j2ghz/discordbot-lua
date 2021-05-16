@@ -1,6 +1,6 @@
 FROM alpine:3
 RUN apk --no-cache add curl
-
+WORKDIR /root
 # broken: RUN curl -L https://github.com/luvit/lit/raw/master/get-lit.sh | sh
 # manual:
 RUN curl -L 'https://github.com/luvit/luvi/releases/download/v2.10.1/luvi-regular-Linux_x86_64' -o luvi && chmod +x ./luvi && ls -lah
@@ -9,4 +9,4 @@ RUN ./lit make lit://luvit/luvit luvit luvi
 
 ADD . /app
 WORKDIR /app/src
-ENTRYPOINT ["luvit", "./main.lua"]
+ENTRYPOINT ["/root/luvit", "./main.lua"]
