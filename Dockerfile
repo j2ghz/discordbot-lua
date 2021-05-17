@@ -1,5 +1,7 @@
 FROM ubuntu
-
+RUN apt update && apt -y install --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists
 #WORKDIR /root
 RUN curl -L https://github.com/luvit/lit/raw/master/get-lit.sh | sh
 # manual:
