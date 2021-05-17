@@ -14,5 +14,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag bookclubbot:$(date +%s)
+    
+#   - name: Build the Docker image
+#     run: docker build . --file Dockerfile --tag bookclubbot:$(date +%s)
+      
+    - name: Push to GitHub Packages
+      uses: docker/build-push-action@v1      
+      with:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        registry: docker.pkg.github.com
+        repository: j2ghz/discordbot-lua/master
+        tag_with_ref: true
