@@ -22,7 +22,7 @@ jobs:
       uses: docker/build-push-action@v1      
       with:
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-        registry: docker.pkg.github.com
-        repository: j2ghz/discordbot-lua/discordbot-lua-bc
+        password: ${{ secrets.CR_PAT }}
+        registry: ghcr.io
+        repository: j2ghz/discordbot-lua-bc
         tag_with_ref: true
