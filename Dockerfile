@@ -1,5 +1,5 @@
 FROM ubuntu
-RUN apt update && apt -y install --no-install-recommends \
+RUN apt update && apt -y install \
     curl \
     && rm -rf /var/lib/apt/lists
 #WORKDIR /root
