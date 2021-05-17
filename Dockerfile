@@ -10,7 +10,7 @@ RUN curl -L https://github.com/luvit/lit/raw/master/get-lit.sh | sh
 #RUN curl -L 'https://lit.luvit.io/packages/luvit/lit/v3.8.1.zip' -o lit.zip && /root/luvi lit.zip -- make lit.zip lit luvi && rm -f lit.zip
 #RUN ./lit make lit://luvit/luvit luvit luvi
 
-LABEL org.opencontainers.image.source = "https://github.com/j2ghz/discordbot-lua"
+LABEL org.opencontainers.image.source "https://github.com/j2ghz/discordbot-lua"
 ADD . /app
 WORKDIR /app/src
 ENTRYPOINT ["/root/luvit", "./main.lua"]
