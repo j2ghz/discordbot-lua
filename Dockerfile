@@ -11,6 +11,11 @@ RUN curl -L https://github.com/luvit/lit/raw/master/get-lit.sh | sh
 #RUN ./lit make lit://luvit/luvit luvit luvi
 
 LABEL org.opencontainers.image.source "https://github.com/j2ghz/discordbot-lua"
+
 ADD . /app
+
+WORKDIR /app
+RUN /lit install
+
 WORKDIR /app/src
 ENTRYPOINT ["/luvit", "./main.lua"]
