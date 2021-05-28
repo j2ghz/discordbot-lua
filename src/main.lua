@@ -12,10 +12,10 @@ local pathjoin = require("pathjoin").pathJoin
 local discordia = require('discordia')
 
 -- constants
-local PREFIX = "~"
+local PREFIX = "bc "
 local LPREFIX = #PREFIX
 
-local COLOR = 0x4321ff
+local COLOR = 0x66BB6A
 local ECOLOR = 0xFF0000
 
 -- setup
