@@ -8,6 +8,7 @@ local SUGGESTION_PATTERN = "^https://anilist.co/manga/%d+/.-/"
 
 local AUTOMATE = true
 local INFO_CHANNEL = "842823870288363560"
+local TALK_CHANNEL = "842768821382414346"
 local AUTO_PING = "<@&842766939675033600>"
 local COOLDOWN_LENGTH = 4
 
@@ -22,23 +23,7 @@ NOTES:
     happens and results are saved properly.
 
 COMMANDS:
-    `suggest <anilist link>` - Suggest a book choice
-    `choices` - Show voting entries
-    `vote <entry ids...>` - Vote for an entry
-
-    `admin open` - Open voting
-    `admin close` - Close voting
-    `admin s_open` - Open suggestions
-    `admin s_close` - Close suggestions
-    `admin save` - Save json data
-    `admin reload` - Reload json data
-    `admin votes` - Show vote points for entries
-    `admin suggestions` - Show all user suggestions
-    `admin remove_suggestion <user id>` - Remove a user's suggestion
-    `admin suggestions2choices` - Create vote entries from user suggestions
-    `admin set_name <entry id> <name>` - Set an entry's name
-    `admin set_link <entry id> <link>` - Set an entry's link
-    `admin send_json <name>` - Sends internal json. Use `admin save` beforehand to get up-to-date data. `<name>` can be one of: `votes`, `voters`, `suggestions`, `genres`, `choices`.
+    Use the `help` command
 
 INITIALIZATION:
     1. create a "backup" folder inside "vote"
@@ -150,16 +135,21 @@ end
 
 -- create hourly backups (use in case of rigged voting or bad teardown)
 local clock = discordia.Clock()
+local discussion_open_current
 local function automation()
     if AUTOMATE then
         local dt = os.date("!*t")
 
         info_channel = info_channel or client:getChannel(INFO_CHANNEL)
+        talk_channel = talk_channel or client:getChannel(TALK_CHANNEL)
 
         -- automate suggestions open/close, alongside with genre randomization
         local suggestions_open = (dt.wday == 6 and dt.hour >= 4 and dt.hour < 16)
         if data_suggestions.running ~= suggestions_open then
             if suggestions_open then
+                -- clear old suggestions
+                data_suggestions = {}
+
                 -- cooldown check
                 local genre
                 repeat
@@ -218,6 +208,23 @@ local function automation()
             -- actually close voting
             data_choices.running = vote_open
         end
+
+        local discussion_open = (dt.wday == 7 or dt.wday == 1)
+        if discussion_open_current == nil then
+            discussion_open_current = discussion_open
+        elseif discussion_open_current ~= discussion_open then
+            if discussion_open then
+                Embed()
+                    :setColor(COLOR)
+                    :setDescription("Spoiler discussion is now allowed.")
+                    :send(talk_channel)
+            else
+                Embed()
+                    :setColor(ECOLOR)
+                    :setDescription("Spoiler discussion has ended and is now NOT allowed.")
+                    :send(talk_channel)
+            end
+        end
     end
 
     local dt = os.date("%m-%d.%H")
@@ -227,6 +234,94 @@ local function automation()
 end
 clock:on("hour", automation)
 clock:start(true)
+
+
+
+local help_messages do
+    local function topic(name)
+        return Embed()
+            :setColor(COLOR)
+            :setTitle("Help - "..name)
+    end
+
+    help_messages = {
+        base = topic("Commands")
+            :setDescription([[
+__How to suggest__
+
+`bc suggest <AniList Link>`
+
+__How to vote__
+
+`bc choices`
+`bc vote 2 6 4`
+
+The above would vote for, in order of priority, entry `2`, followed by entry `6` and then entry `4`.
+
+You are __not__ limited to any specific amount of votes, but each entry after the first will receive half the amount of points of the previous.
+
+__More Help__
+
+Send `bc help admin` to know about commands available to Book Club Leaders.
+Send `bc help weighting` for more detailed information about how entries get points based on your votes.
+]]):build(),
+        admin = topic("Leader Commands")
+            :setDescription([[
+__Voting and votes__
+Use `bc admin open` and `bc admin close` to open and close voting.
+
+`bc admin votes` shows all entries and their accumulated vote points.
+`bc admin top` shows the currently winning entry.
+`bc admin reset_votes` resets all user votes.
+
+__Suggestions__
+Use `bc admin s_open` and `bc admin s_close` to open and close suggestions.
+
+`bc admin suggestions` shows all suggestions.
+`bc admin reset_suggestions` removes all suggestions.
+`bc admin remove_suggestion <User ID>` removes a user's suggestion.
+
+__Voting choices__
+`bc admin suggestions2choices` converts user suggestions to voting entries.
+`bc admin set_name <ID> <Name>` corrects the name for a voting entry.
+`bc admin set_link <ID> <AniList Link>` corrects the link for a voting entry.
+
+__Data__
+`bc admin save`
+`bc admin reload`
+`bc admin send_json <votes | voters | suggestions | genres | choices>`
+]]):build(),
+        weighting = topic("Vote Weigthing Math Stuff")
+            :setDescription([[
+__The Formula__
+`(0.5 ^ (n - 5))`
+
+__How?__
+The above is calculated with `n` being the vote's index for each choice you make. Your primary vote has `n = 1`, the 2nd vote has `n = 2`, etc..
+Fill it in the formula, calculate, add the result to the entry's points.
+
+__Why?__
+Let's break it down to a more general case: `(v ^ (n - h))`. Exponentiation is used so each vote is less powerful than the previous by the predefined constant.
+
+In this context, voting and accumulating points, the `h` constant doesn't matter. Because of how the votes are counted in the end, `w` could be anything, and the order of the winners would be the exact same. `5` is used to give a sense that voting for multiple entries is worth something.
+It's also the number `n` at which the vote power for an entry becomes `1`, because `x^0 = 1`.
+
+`v` defines how steep the curve is. `0.5` means that each vote has half the value of the previous, which was chosen for two reasons. Firstly, it's quite an intuitive calculation to halve something, but the main and second reason is so that 2 secondary votes is equivalent so a primary vote (and the same applies for any value of `n-1` and `n`, because of exponentiation).
+]]):build(),
+    }
+end
+
+local help_alias = {
+    ["default"] = "base", ["commands"] = "base",
+    ["leader"] = "admin",
+    ["math"] = "weighting",
+    ["weight"] = "weighting", ["weights"] = "weighting",
+    ["points"] = "weighting", ["formula"] = "weighting",
+    ["borda"] = "weighting", ["count"] = "weighting", ["counting"] = "weighting",
+}
+for k,_ in pairs(help_messages) do
+    help_alias[k] = k
+end
 
 return {
     name = "Vote",
@@ -258,7 +353,7 @@ return {
         ["function"] = function()
             if not data_choices.running then
                 Embed()
-                    :setColor(0xFF0000)
+                    :setColor(ECOLOR)
                     :setTitle("Error")
                     :setDescription("Voting is currently closed.")
                     :send(m)
@@ -282,6 +377,25 @@ return {
             reply(choices_text)
         end
     }, {
+        ["name"] = "help",
+        ["check"] = CHECK,
+        ["aliases"] = {}, ["args"] = {
+            { name = "topic", type = "string?" }
+        },
+        ["function"] = function()
+            local topic_name = help_alias[topic or "base"]
+            if not topic_name then
+                Embed()
+                    :setColor(ECOLOR)
+                    :setTitle("Error")
+                    :setDescription("`%s` is not a help topic.\nSend `bc help` to get help.")
+                    :send(m)
+                return
+            end
+
+            reply(help_messages[topic_name])
+        end
+    }, {
         ["name"] = "suggest",
         ["check"] = CHECK,
         ["aliases"] = {}, ["args"] = {
@@ -290,20 +404,25 @@ return {
         ["function"] = function()
             if not data_suggestions.running then
                 Embed()
-                    :setColor(0xFF0000)
+                    :setColor(ECOLOR)
                     :setTitle("Error")
-                    :setDescription("Voting is currently closed.")
+                    :setDescription("Suggestions are currently closed.")
                     :send(m)
                 return
             end
 
             local old = data_suggestions[u.id]
 
+            if #link >= 3 and link:sub(1,1) == "<" and link:sub(-1,-1) == ">" then
+                link = link:sub(2,-2)
+            end
+
             if not link:match(SUGGESTION_PATTERN) then
                 Embed()
-                    :setColor(0xFF0000)
+                    :setColor(ECOLOR)
                     :setTitle("Error")
-                    :setDescription("You suggestion must be a valid AniList link.")
+                    :setDescription("Your suggestion must be a valid AniList link.\n"
+                                .. "Format: `https://anilist.co/manga/[id]/[name]/`")
                     :send(m)
                 return
             end
@@ -324,7 +443,7 @@ return {
         ["function"] = function()
             if not data_choices.running then
                 Embed()
-                    :setColor(0xFF0000)
+                    :setColor(ECOLOR)
                     :setTitle("Error")
                     :setDescription("Voting is currently closed.")
                     :send(m)
@@ -333,7 +452,7 @@ return {
 
             if data_voters[u.id] then
                 Embed()
-                    :setColor(0xFF0000)
+                    :setColor(ECOLOR)
                     :setTitle("Error")
                     :setDescription("You have already voted this week.")
                     :send(m)
@@ -342,7 +461,7 @@ return {
 
             if #choices < 1 then
                 Embed()
-                    :setColor(0xFF0000)
+                    :setColor(ECOLOR)
                     :setTitle("Error")
                     :setDescription("You must vote for at least one entries.")
                     :send(m)
@@ -353,7 +472,7 @@ return {
             for _,v in ipairs(choices) do
                 if dedup[v] then
                     Embed()
-                        :setColor(0xFF0000)
+                        :setColor(ECOLOR)
                         :setTitle("Error")
                         :setDescription("Duplicate choice `%d`.", v)
                         :send(m)
@@ -363,9 +482,9 @@ return {
             end
 
             for _,num in ipairs(choices) do
-                if not data_choices.names[num] then
+                if not data_vote[num] then
                     Embed()
-                        :setColor(0xFF0000)
+                        :setColor(ECOLOR)
                         :setTitle("Error")
                         :setDescription("Invalid choice: entry `%d` does not exist.", num)
                         :send(m)
@@ -375,11 +494,14 @@ return {
 
             data_voters[user.id] = true
 
+            local str = {}
             for n,choice in ipairs(choices) do
-                data_vote[choice] = (data_vote[choice] or 0) + (0.5 ^ (n - 1))
+                local value = (0.5 ^ (n - 5))
+                data_vote[choice] = data_vote[choice] + value
+                str[n] = (" - %s, giving it `%g points` \n"):format(data_choices.names[choice], value)
             end
 
-            reply("Successfully voted.")
+            reply("Successfully voted for:\n%s", table.concat(str))
         end
     } },
     groups = {
@@ -399,7 +521,14 @@ return {
 
                 reply(table.concat(str, "\n"))
             end
-        },{
+        }, {
+            ["name"] = "help",
+            ["check"] = ADMIN_CHECK,
+            ["aliases"] = {}, ["args"] = {},
+            ["function"] = function()
+                reply(help_messages.admin)
+            end
+        }, {
             ["name"] = "votes",
             ["check"] = ADMIN_CHECK,
             ["aliases"] = { "show" }, ["args"] = {},
@@ -414,10 +543,31 @@ return {
 
                 local str = {}
                 for i,v in pairs(sorted) do
-                    str[i] = ("<%s> (`%d %s`) - %d points"):format(data_choices.links[v.i], v.i, data_choices.names[v.i], v.votes)
+                    str[i] = ("<%s> (`%d %s`) - %.2f points"):format(data_choices.links[v.i], v.i, data_choices.names[v.i], v.votes)
                 end
 
                 reply(table.concat(str, "\n"))
+            end
+        }, {
+            ["name"] = "top",
+            ["check"] = ADMIN_CHECK,
+            ["aliases"] = { "winner" }, ["args"] = {},
+            ["function"] = function()
+                local sorted = {}
+                for i,v in pairs(data_vote) do
+                    sorted[i] = { i = i, votes = v }
+                end
+                table.sort(sorted, function(a, b)
+                    return a.votes > b.votes
+                end)
+
+                local diff = sorted[2].votes - sorted[1].votes
+                if diff < 0.05 then
+                    reply("Tie (or very close). Top 2 entries are %f points apart.", diff)
+                else
+                    local v = sorted[1]
+                    reply("<%s> (`%d %s`) is currently leading with %.2f points.", data_choices.links[v.i], v.i, data_choices.names[v.i], v.votes)
+                end
             end
         }, {
             ["name"] = "remove_suggestion",
@@ -456,11 +606,44 @@ return {
                     end
                 end
 
+                reply("```json\n%s\n```", json.encode(data_choices))
+
                 data_choices.names = names
                 data_choices.links = links
 
+                -- reset votes
+                data_vote = {}
+                for i=1,#names do
+                    data_vote[i] = 0
+                end
+
+                data_voters = {}
+
+                -- save
+                write_json("../vote/votes.json", data_vote)
+                write_json("../vote/voters.json", data_voters)
                 write_json("../vote/choices.json", data_choices)
-                reply("```json\n%s\n```", json.encode(data_choices))
+            end
+        }, {
+            ["name"] = "reset_votes",
+            ["check"] = ADMIN_CHECK,
+            ["aliases"] = {}, ["args"] = {},
+            ["function"] = function()
+                data_vote = {}
+                for i=1,#data_choices.names do
+                    data_vote[i] = 0
+                end
+                reply("Success.")
+            end
+        }, {
+            ["name"] = "reset_suggestions",
+            ["check"] = ADMIN_CHECK,
+            ["aliases"] = {}, ["args"] = {},
+            ["function"] = function()
+                data_suggestions = {
+                    running = data_suggestions.running
+                }
+                reply("Success.")
             end
         }, {
             ["name"] = "set_link",
