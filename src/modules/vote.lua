@@ -147,7 +147,7 @@ local function automation()
         talk_channel = talk_channel or client:getChannel(TALK_CHANNEL)
 
         -- automate suggestions open/close, alongside with genre randomization
-        local suggestions_open = (dt.wday == 6 and dt.hour >= 4 and dt.hour < 16)
+        local suggestions_open = (dt.wday == 5 and dt.hour >= 16 and dt.hour < 16)
         if data_suggestions.running ~= suggestions_open then
             if suggestions_open then
                 -- clear old suggestions
@@ -262,19 +262,32 @@ __How to suggest__
 
 `bc suggest <AniList Link>`
 
-__How to vote__
+__How to vote__ **(New voting system)**
 
-`bc choices`
-`bc vote 2 6 7 3 11 4`
+You vote against series that you would not discuss in <#842768821382414346>, if selected.
 
-The above would vote for, in order of priority, entry `2`, followed by entry `6`, entry `7`, entry `3`, entry `11`, and finally entry `4`.
+For example, `bc reject 2 6 7 3 11 4`
 
-You are __not__ limited to any specific amount of votes, but each entry after the first will receive half the amount of points of the previous.
+The above would vote ***against*** entries `2`, `6`, `7`, `3`, `11`, and `4`.
+
+You are __not__ limited to any specific amount of rejections.
 
 __More Help__
 
 Send `bc help admin` to know about commands available to Book Club Leaders.
 Send `bc help weighting` for the detailed mathematical information about how entries get points.
+]]):build(),
+        temp = topic("Rejection Voting ⚠️")
+            :setDescription([[
+This week, as a test, rejection voting is used.
+
+Instead of voting for series you want to read, you vote against series that you would not discuss in <#842768821382414346>, if selected.
+
+For example, `bc reject 2 6 7 3 11 4`
+
+The above would vote ***against*** entries `2`, `6`, `7`, `3`, `11`, and `4`.
+
+You are __not__ limited to any specific amount of rejections.
 ]]):build(),
         admin = topic("Leader Commands")
             :setDescription([[
@@ -321,6 +334,36 @@ for k,_ in pairs(help_messages) do
     help_alias[k] = k
 end
 
+local function CHOICES(admin)
+    return function()
+        if not admin and not data_choices.running then
+            choices_text = nil
+            Embed()
+                :setColor(ECOLOR)
+                :setTitle("Error")
+                :setDescription("Voting is currently closed.")
+                :send(m)
+            return
+        end
+
+        if not choices_text then
+            local amm = #data_choices.names
+            local len = #tostring(amm) + 1
+
+            local str = {}
+            for i=1,amm do
+                local s = tostring(i)
+                local n = data_choices.names[i]
+                str[i] = "`" .. s .. (" "):rep(len - #s) .. n .. "` <" .. data_choices.links[i] .. ">"
+            end
+
+            choices_text = table.concat(str, "\n")
+        end
+
+        reply(choices_text)
+    end
+end
+
 return {
     name = "Vote",
     emoji = "🗳️",
@@ -350,33 +393,7 @@ return {
         ["name"] = "choices",
         ["check"] = CHECK,
         ["aliases"] = { "entries" }, ["args"] = {},
-        ["function"] = function()
-            if not data_choices.running then
-                choices_text = nil
-                Embed()
-                    :setColor(ECOLOR)
-                    :setTitle("Error")
-                    :setDescription("Voting is currently closed.")
-                    :send(m)
-                return
-            end
-
-            if not choices_text then
-                local amm = #data_choices.names
-                local len = #tostring(amm) + 1
-
-                local str = {}
-                for i=1,amm do
-                    local s = tostring(i)
-                    local n = data_choices.names[i]
-                    str[i] = "`" .. s .. (" "):rep(len - #s) .. n .. "` <" .. data_choices.links[i] .. ">"
-                end
-
-                choices_text = table.concat(str, "\n")
-            end
-
-            reply(choices_text)
-        end
+        ["function"] = CHOICES(false)
     }, {
         ["name"] = "help",
         ["check"] = CHECK,
@@ -467,6 +484,15 @@ return {
         end
     }, {
         ["name"] = "vote",
+        ["check"] = ADMIN_CHECK,
+        ["aliases"] = {}, ["args"] = {
+            { name = "choices", type = "int*" },
+        },
+        ["function"] = function()
+            reply(help_messages.temp)
+        end
+    }, {
+        ["name"] = "reject",
         ["check"] = CHECK,
         ["aliases"] = {}, ["args"] = {
             { name = "choices", type = "int+" },
@@ -494,7 +520,7 @@ return {
                 Embed()
                     :setColor(ECOLOR)
                     :setTitle("Error")
-                    :setDescription("You must vote for at least one entries.")
+                    :setDescription("You must reject at least one entry.")
                     :send(m)
                 return
             end
@@ -531,18 +557,24 @@ return {
             -- add values to vote data
             local str = {}
             for n,choice in ipairs(choices) do
-                local value = (0.5 ^ (n - 5))
+                local value = -1 -- (0.5 ^ (n - 5))
                 data_vote[choice] = data_vote[choice] + value
+
                 -- temporarily remove point info while we experiment with different voting systems.
                 str[n] = (" - %s\n"):format(data_choices.names[choice])
                 -- str[n] = (" - %s, giving it `%g points` \n"):format(data_choices.names[choice], value)
             end
 
-            reply("Successfully voted for:\n%s", table.concat(str))
+            reply("Successfully voted against:\n%s", table.concat(str))
         end
     } },
     groups = {
         admin = { {
+            ["name"] = "choices",
+            ["check"] = ADMIN_CHECK,
+            ["aliases"] = { "entries" }, ["args"] = {},
+            ["function"] = CHOICES(true)
+        }, {
             ["name"] = "suggestions",
             ["check"] = ADMIN_CHECK,
             ["aliases"] = {}, ["args"] = {},
@@ -589,9 +621,17 @@ return {
             ["name"] = "votes_rerun",
             ["check"] = ADMIN_CHECK,
             ["aliases"] = {}, ["args"] = {
-                { name = "func", type = "string" }
+                { name = "func", type = "string" },
+                { name = "week", type = "string?" }
             },
             ["function"] = function()
+                local log = data_log
+                local l_choices = data_choices
+                if week then
+                    log = read_json("../vote/log/"..week..".json")
+                    l_choices = log.choices
+                end
+
                 -- compile weighting function
                 local f, err = loadstring("local n=...;return "..func)
                 if not f then
@@ -726,6 +766,7 @@ return {
             ["check"] = ADMIN_CHECK,
             ["aliases"] = {}, ["args"] = {},
             ["function"] = function()
+                data_voters = {}
                 data_vote = {}
                 for i=1,#data_choices.names do
                     data_vote[i] = 0
@@ -831,7 +872,10 @@ return {
                 { name = "name", type = "string" }
             },
             ["function"] = function()
-                reply("```json\n%s\n```", fs.readFileSync(("../vote/%s.json"):format(name)))
+                local f = name .. ".json"
+                reply({
+                    file = { f, fs.readFileSync("../vote/" .. f) }
+                })
             end
         } }
     }
