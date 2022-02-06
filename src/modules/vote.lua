@@ -12,7 +12,7 @@ local AUTOMATE = true
 local INFO_CHANNEL = "842823870288363560"
 local TALK_CHANNEL = "842768821382414346"
 local AUTO_PING = "<@&842766939675033600>"
-local COOLDOWN_LENGTH = 4
+local COOLDOWN_LENGTH = 8
 
 math.randomseed(os.time())
 

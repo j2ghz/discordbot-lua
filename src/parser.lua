@@ -23,7 +23,7 @@ return function(str)
     local function stop(c, islast)
         if s == CMD then
             cmd = (cmd or aliases)[cur] -- cmd is non-nil if in group
-            if not cmd then return nil, "Invalid command." end
+            if not cmd then return nil, "Invalid command. Try: bc help" end
             cur = ""
             if not cmd.group then
                 defs = cmd.args
@@ -107,7 +107,7 @@ return function(str)
             if s == QTE then
                 s = NRM
             elseif s == CMD then
-                return nil, "Invalid command."
+                return nil, "Invalid command. Try: bc help"
             else
                 s = QTE
             end
