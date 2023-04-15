@@ -1,0 +1,12 @@
+version: "2"
+services:
+  bot:
+    build:
+      context: .
+    restart: unless-stopped
+    # mem_limit: 150m
+    environment:
+      # - DISCORD_APPLICATION_ID=439837440098828290
+      - token=ODQzOTUwMjQ0MTE0NTk1ODUw.YKLT6g.CEAh5DSzhGR6eDjBeWsNzf2IwfY
+    volumes:
+      - ./vote:/app/vote
