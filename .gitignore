@@ -15,3 +15,5 @@ emmy/discordia
 
 *.*-project
 *.*-workspace
+
+docker-compose.yaml
