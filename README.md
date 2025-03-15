@@ -1,3 +1,7 @@
+> [!WARNING]  
+> Archived because the book club has ended.
+
+
 # discordbot-lua
 
 ## Running
